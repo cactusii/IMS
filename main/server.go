@@ -49,10 +49,31 @@ func (server *Server) Handle(conn net.Conn) {
 	server.mapLock.Unlock()
 
 	server.Broadcast(user, "上线！")
+
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			n, err := conn.Read(buf)
+			if n == 0 {
+				server.Broadcast(user, "下线")
+				return
+			}
+			if err != nil {
+				fmt.Println("conn read err:", err)
+				return
+			}
+			msg := string(buf[:n-1])
+			server.Broadcast(user, msg)
+		}
+	}()
+
+	select {
+
+	}
 }
 
 func (server *Server) Start() {
-	// socket listen
+	// socket 监听
 	listen, err := net.Listen("tcp4", fmt.Sprintf("%s:%d", server.Ip, server.Port))
 	if err != nil {
 		fmt.Println(err)
@@ -61,7 +82,7 @@ func (server *Server) Start() {
 	// close
 	defer listen.Close()
 
-	// 监听Massage
+	// 监听用户的Massage
 	go server.ListenMsg()
 
 	// accept
