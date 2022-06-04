@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 )
 
 type Server struct {
@@ -41,21 +42,17 @@ func (server *Server) Broadcast(user *User, msg string) {
 }
 
 func (server *Server) Handle(conn net.Conn) {
-	defer conn.Close()
-	user := NewUser(conn.RemoteAddr().String(), conn)
+	user := NewUser(conn.RemoteAddr().String(), conn, server)
+	user.Online()
 
-	server.mapLock.Lock()
-	server.OnlineMap[conn.RemoteAddr().String()] = user
-	server.mapLock.Unlock()
-
-	server.Broadcast(user, "上线！")
+	isLive := make(chan bool)
 
 	go func() {
 		buf := make([]byte, 4096)
 		for {
 			n, err := conn.Read(buf)
 			if n == 0 {
-				server.Broadcast(user, "下线")
+				user.Offline()
 				return
 			}
 			if err != nil {
@@ -63,12 +60,26 @@ func (server *Server) Handle(conn net.Conn) {
 				return
 			}
 			msg := string(buf[:n-1])
-			server.Broadcast(user, msg)
+
+			user.DoMsg(msg)
+
+			// 每次用户发消息，会向isLive管道中发送消息
+			isLive <- true
 		}
 	}()
 
-	select {
+	for {
+		select {
+		// 当isLive出现消息，会执行isLive的case，
+		// 之后本次的select会结束，进入下一次for循环，time.After重置，
+		// 这样去保证一个超时机制
+		case <- isLive:
+		case <- time.After(time.Second * 10):
+			// 强制下线
+			user.Offline()
+			return
 
+		}
 	}
 }
 
