@@ -31,7 +31,7 @@ func (user *User) Online() {
 	user.server.OnlineMap[user.Name] = user
 	user.server.mapLock.Unlock()
 
-	user.server.Broadcast(user, "上线！")
+	user.server.Broadcast(user, "上线！\n")
 }
 
 func (user *User) sendMsg(msg string) {
@@ -50,7 +50,7 @@ func (user *User) DoMsg(msg string) {
 		newName := strings.Split(msg, " ")[1]
 		_, ok := user.server.OnlineMap[newName]
 		if ok {
-			user.sendMsg(newName + "已存在！")
+			user.sendMsg(newName + "已存在！\n")
 		} else {
 			user.server.mapLock.Lock()
 			delete(user.server.OnlineMap, user.Name)
@@ -58,7 +58,16 @@ func (user *User) DoMsg(msg string) {
 			user.server.mapLock.Unlock()
 
 			user.Name = newName
-			user.sendMsg("更新成功！")
+			user.sendMsg("更新成功！\n")
+		}
+	} else if msg[:2] == "to" {
+		dstName := strings.Split(msg, " ")[1]
+		dstUser, ok := user.server.OnlineMap[dstName]
+		if !ok {
+			user.sendMsg(dstName + "不存在！\n")
+		} else {
+			dstMsg := strings.Split(msg, " ")[2]
+			dstUser.sendMsg(user.Name + ": " + dstMsg + "\n")
 		}
 	} else {
 		user.server.Broadcast(user, msg)
